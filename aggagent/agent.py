@@ -172,6 +172,7 @@ class AggAgent:
                 "temperature": 1.0,
                 "top_p": 0.95,
                 "max_tokens": 10000,
+                "timeout": 3600,
                 "parallel_tool_calls": False,
                 "tools": tools,
             }
