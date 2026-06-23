@@ -298,7 +298,7 @@ class AggAgent(Strategy):
         instance = run_results[0].get("instance", {})
         # item = {"question": question, **instance}
         #〔讲解〕item 把题面和首条轨迹全部字段合并,作为判分函数所需的「题目+参考」上下文。
-        item = {"question": question, **run_results[0]}
+        item = {"question": question, **instance}
 
         #〔讲解〕healthbench 特例:题面是多轮对话,需把 prompt 里每条 {role,content} 拼成多行字符串当 question。
         if self.task == "healthbench":
