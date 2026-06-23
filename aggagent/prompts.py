@@ -1,3 +1,13 @@
+# 〔讲解〕本文件 = AggAgent(会调工具的"聚合智能体")的全部 prompt 文本仓库,纯常量、无逻辑。
+# 〔讲解〕在 pipeline 里属于「aggregation/aggagent 这一环」:rollout/ 先跑出 N 条 ReAct 搜索轨迹,
+# 〔讲解〕本环的聚合智能体读这些 prompt,按 system+user 模板被驱动,通过工具(get_solution / search_trajectory /
+# 〔讲解〕get_segment)回读多条轨迹,再 synthesize 出一份最终答案;最后交给 evaluation/ 用大模型判分。
+# 〔讲解〕上游 = rollout 产出的轨迹元数据(填进 {metadata}/{question}/{traj_N});下游 = aggagent 主循环消费这些字符串。
+
+# 〔讲解〕AggAgent 的「系统提示(短答案版)」。定义聚合智能体的整体人设、职责、必走流程、采纳原则、
+# 〔讲解〕常见坑、以及最终 finish 工具要求的 <explanation>/<answer> 两段式输出格式。
+# 〔讲解〕核心理念:工具返回值=客观事实(ground truth),智能体的"推断"=可能出错的解读;冲突时信工具不信措辞。
+# 〔讲解〕字符串内部一字不动 —— 讲解只放在赋值行上方。
 SYSTEM_PROMPT_AGGAGENT = """You are an aggregation agent. You are provided with a task and a set of candidate trajectories from independent agents that attempted to solve it. Your goal is to synthesize the most accurate, complete solution by drawing on the best reasoning and evidence across trajectories.
 
 You do NOT have access to the ground truth solution.
@@ -66,6 +76,9 @@ The 'solution' argument must be a single string with exactly two XML sections: <
 Call 'finish' only after verifying key reasoning against actual tool outputs. Do not finish after only reading metadata or only get_solution; verify at least one critical claim with get_segment or search_trajectory when trajectories disagree.
 """
 
+# 〔讲解〕配套上面 system 的「用户提示模板」。运行时用 .format(...) 把任务题面、轨迹元数据、轨迹条数填进去。
+# 〔讲解〕三个占位符:{question}=原始任务;{metadata}=每条轨迹的概览(步数/模式,供"先勘探"用);{traj_N}=轨迹总数。
+# 〔讲解〕.strip() 去掉模板首尾空白行,避免拼进对话时多出空行。trajectory_id 合法范围 1..traj_N 在这里明确告知模型。
 USER_PROMPT_AGGAGENT = """TASK:
 {question}
 
@@ -75,6 +88,9 @@ TRAJECTORY METADATA:
 You have {traj_N} candidate trajectories. Valid trajectory_id values are 1 to {traj_N}. Synthesize the most accurate answer and call 'finish' with your solution and reason.
 """.strip()
 
+# 〔讲解〕系统提示的「Qwen 适配版」。内容与 SYSTEM_PROMPT_AGGAGENT 几乎一致,唯一关键差异在最后的输出格式:
+# 〔讲解〕Qwen 等模型对 XML 标签不稳,故改用纯文本两段式 "Explanation: ... / Exact Answer: ...",避免标签解析失败。
+# 〔讲解〕同一套聚合方法论按目标模型换"答案壳子" —— 这是多模型适配的常见做法。
 SYSTEM_PROMPT_AGGAGENT_QWEN = """You are an aggregation agent. You are provided with a task and a set of candidate trajectories from independent agents that attempted to solve it. Your goal is to synthesize the most accurate, complete solution by drawing on the best reasoning and evidence across trajectories.
 
 You do NOT have access to the ground truth solution.
@@ -146,6 +162,11 @@ Exact Answer: {{the exact answer}}
 Call 'finish' only after verifying key reasoning against actual tool outputs. Do not finish after only reading metadata or only get_solution; verify at least one critical claim with get_segment or search_trajectory when trajectories disagree.
 """
 
+# 〔讲解〕系统提示的「长文报告版(REPORT)」。面向开放式/长答案任务(非单一精确答案),目标是产出一篇统一长文。
+# 〔讲解〕与短答案版的关键不同:① 多了第 5 步 Synthesize(整合各候选最优论述、避免拼贴);
+# 〔讲解〕② 用 QUALITY CRITERIA(完整/准确/连贯/自洽/引用)替代固定答案格式;
+# 〔讲解〕③ 要求 <cite url="...">...</cite> 只引用工具返回过的真实片段,禁止编造 URL;
+# 〔讲解〕④ finish 收两个字段 solution_report(成稿)+ reason(如何整合并消解冲突)。
 SYSTEM_PROMPT_AGGAGENT_REPORT = """You are an aggregation agent. You are provided with a task and a set of candidate trajectories from independent agents that attempted to solve it. Your goal is to synthesize the most accurate, complete solution by drawing on the best reasoning and evidence across trajectories.
 
 You do NOT have access to the ground truth.
@@ -209,6 +230,8 @@ You must follow these steps before calling 'finish'.
 Call 'finish' with 'solution_report' (your complete synthesized response) and 'reason' (a concise account of how you combined the candidates and resolved any conflicts) after you have read and compared all candidates.
 """
 
+# 〔讲解〕配套报告版的「用户提示模板」。同样三个占位符,但措辞强调产出"long-form response(长文)"。
+# 〔讲解〕与短答案版 USER_PROMPT_AGGAGENT 是平行关系:运行时按任务类型二选一拼装。
 USER_PROMPT_AGGAGENT_REPORT = """TASK:
 {question}
 
@@ -218,4 +241,6 @@ TRAJECTORY METADATA:
 You have {traj_N} candidate responses. Valid trajectory_id values are 1 to {traj_N}. Synthesize the best long-form response and call 'finish'.
 """.strip()
 
+# 〔讲解〕"逼停"兜底消息。当聚合智能体回读轨迹太多、逼近上下文上限时,主循环把这句塞进对话,强制它立刻调 finish。
+# 〔讲解〕作用是给"模型一直探索停不下来"兜底,确保即便信息不全也能产出当前最可能的答案,避免轮次无限膨胀/爆上下文。
 FINAL_MESSAGE = "You have now reached the maximum context length you can handle. You should call 'finish' tool, and based on all the information above, think again and provide what you consider the most likely solution."
