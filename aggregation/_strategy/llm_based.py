@@ -371,7 +371,7 @@ class SolAgg(Strategy):
         instance = run_results[0].get("instance", {})
         # item = {"question": question, **instance}
         #〔讲解〕item 是传给判分器的「题目+元信息」打包(展开整条轨迹记录,含答案/rubric 等判分所需字段)。
-        item = {"question": question, **run_results[0]}
+        item = {"question": question, **instance}
 
         #〔讲解〕healthbench 任务的「问题」其实是一段多轮对话(prompt 列表),这里把它拼成字符串当作 question 喂给整合 prompt。
         if self.task == "healthbench":
