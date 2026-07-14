@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SPEC-037 territory brief draft",
+  "description": "Demo-only four-part contract; SPEC-038 owns the final schema.",
+  "type": "object",
+  "properties": {
+    "route": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "landmarks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "hazards": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "blind_spots": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "required": ["route", "landmarks", "hazards", "blind_spots"],
+  "additionalProperties": false
+}
