@@ -240,7 +240,7 @@ class AggAgent(Strategy):
         question = run_results[0].get("question", "")
         instance = run_results[0].get("instance", {})
         # item = {"question": question, **instance}
-        item = {"question": question, **run_results[0]}
+        item = {"question": question, **instance}
 
         if self.task == "healthbench":
             question = "\n".join(
